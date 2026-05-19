@@ -499,3 +499,63 @@ a { text-decoration: none; }
   border-color: rgba(0,245,255,0.3);
 }
 .chip-cyan:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EDITOR RESPONSIVE LAYOUT
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* --- Tablet (≤ 1024px): collapse sidebar to a smaller width --- */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 280px;
+  }
+}
+
+/* --- Small tablet (≤ 768px): hide page strip, stack sidebar below viewer --- */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%;
+  }
+
+  .page-strip {
+    display: none !important;
+  }
+
+  .editor-body {
+    flex-direction: column !important;
+  }
+
+  .editor-viewer {
+    flex: none !important;
+    height: 55vh;
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .editor-sidebar {
+    width: 100% !important;
+    height: 45vh;
+    flex-shrink: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .editor-topbar {
+    padding: 0 12px !important;
+  }
+}
+
+/* --- Mobile (≤ 480px): slim topbar --- */
+@media (max-width: 480px) {
+  .editor-viewer {
+    height: 50vh;
+  }
+
+  .editor-sidebar {
+    height: 50vh;
+  }
+
+  :root {
+    --sidebar-width: 100%;
+  }
+}
+

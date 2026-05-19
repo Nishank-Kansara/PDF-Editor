@@ -164,6 +164,71 @@ def change_background(input_path: str, output_path: str, color: list):
 
     _save(doc, output_path)
 
+
+def invert_colors(input_path: str, output_path: str,
+                  bg_color: list = None, text_color: list = None):
+    """
+    Convert PDF to dark mode:
+      - Draws a solid background rectangle (default black) behind all existing content.
+      - Redraws all text spans in text_color (default white) so they remain readable.
+      - Images are left untouched — they render on top of the new background naturally.
+
+    This is done purely with PyMuPDF — no OCR, no OpenAI.
+    """
+    if bg_color is None:
+        bg_color = [0, 0, 0]          # black
+    if text_color is None:
+        text_color = [1, 1, 1]        # white
+
+    doc = _open(input_path)
+
+    for page in doc:
+        # 1. Paint the background (underlay — goes behind existing content)
+        page.draw_rect(page.rect, color=None, fill=bg_color, overlay=False)
+
+        # 2. Extract all text with full detail (spans give us position + font info)
+        blocks = page.get_text("rawdict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+
+        for block in blocks:
+            if block.get("type") != 0:  # skip image blocks
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span.get("text", "").strip()
+                    if not text:
+                        continue
+
+                    # Redact the old (now-invisible-on-black) text area cleanly
+                    span_rect = fitz.Rect(span["bbox"])
+                    page.add_redact_annot(span_rect, fill=bg_color)  # fill with bg
+
+        page.apply_redactions()
+
+        # 3. Re-insert all text in the new color
+        blocks2 = page.get_text("rawdict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+        for block in blocks2:
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span.get("text", "")
+                    if not text.strip():
+                        continue
+                    origin = span.get("origin")
+                    if not origin:
+                        continue
+                    fontsize = span.get("size", 11)
+                    # Use a standard font to avoid missing embedded font issues
+                    page.insert_text(
+                        origin,
+                        text,
+                        fontsize=fontsize,
+                        color=text_color,
+                        overlay=True,
+                    )
+
+    _save(doc, output_path)
+
 # ── Utility ───────────────────────────────────────────────────────────────────
 
 def _insert_wrapped_text(page, text: str, x: float, y: float,

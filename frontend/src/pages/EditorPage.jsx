@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import PDFViewer from '../components/ui/PDFViewer'
 import CommandPanel from '../components/ui/CommandPanel'
+import PageStrip from '../components/ui/PageStrip'
 import useEditorStore from '../store/editorStore'
-import { uploadPDF } from '../services/api'
+import { uploadPDF, getPageThumbnails } from '../services/api'
 
 export default function EditorPage() {
   const navigate = useNavigate()
-  const { fileName, fileId, setUpload, setUploadedFile, reset } = useEditorStore()
+  const { fileName, fileId, setUpload, setUploadedFile, setPages, reset } = useEditorStore()
   const inputRef = useRef()
 
   const handleNewUpload = useCallback(async (file) => {
@@ -18,13 +19,18 @@ export default function EditorPage() {
       reset()
       setUpload(data)
       setUploadedFile(file)
+      // Fetch page thumbnails in background
+      getPageThumbnails(data.file_id)
+        .then((pages) => setPages(pages))
+        .catch((err) => console.warn('Thumbnail fetch failed:', err))
     } catch (err) {
       alert('Upload failed: ' + (err?.response?.data?.detail ?? err.message))
     }
-  }, [reset, setUpload, setUploadedFile])
+  }, [reset, setUpload, setUploadedFile, setPages])
 
   return (
     <div
+      className="editor-root"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -35,6 +41,7 @@ export default function EditorPage() {
     >
       {/* ── Editor Topbar ───────────────────────────────────────────────── */}
       <div
+        className="editor-topbar"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -140,10 +147,14 @@ export default function EditorPage() {
       </div>
 
       {/* ── Main Split Layout ────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="editor-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* LEFT: PDF Viewer */}
+        {/* PAGE STRIP — left thumbnail column (only when PDF loaded) */}
+        {fileId && <PageStrip />}
+
+        {/* CENTER: PDF Viewer */}
         <div
+          className="editor-viewer"
           style={{
             flex: 1,
             overflow: 'hidden',
@@ -161,6 +172,7 @@ export default function EditorPage() {
 
         {/* RIGHT: AI Command Panel */}
         <div
+          className="editor-sidebar"
           style={{
             width: 'var(--sidebar-width)',
             flexShrink: 0,

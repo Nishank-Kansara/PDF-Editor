@@ -8,6 +8,7 @@ const useEditorStore = create((set) => ({
   pageCount: 0,
   textPreview: '',
   uploadedFile: null,  // raw File object for PDF.js viewer
+  pages: [],           // array of {page, width, height, data} thumbnails
 
   // Edit state
   instruction: '',
@@ -33,30 +34,32 @@ const useEditorStore = create((set) => ({
 
   setUploadedFile: (file) => set({ uploadedFile: file }),
 
+  setPages: (pages) => set({ pages }),
+
   setInstruction: (instruction) => set({ instruction }),
 
   setProcessing: (isProcessing) => set({ isProcessing }),
 
   setEditResult: (result) => set((state) => {
-    // result.download_url comes as "/download/{id}" — extract the id
     const outputId = result.output_id || result.download_url?.split('/').pop()
     return {
-    downloadUrl: getDownloadUrl(outputId),
-    lastAction: result.action_taken,
-    actionDescription: result.description,
-    editHistory: [
-      {
-        id: Date.now(),
-        instruction: state.instruction,
-        action: result.action_taken,
-        description: result.description,
-        timestamp: new Date().toLocaleTimeString(),
-      },
-      ...state.editHistory,
-    ],
-    instruction: '',
-    isProcessing: false,
-  }}),
+      downloadUrl: getDownloadUrl(outputId),
+      lastAction: result.action_taken,
+      actionDescription: result.description,
+      editHistory: [
+        {
+          id: Date.now(),
+          instruction: state.instruction,
+          action: result.action_taken,
+          description: result.description,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+        ...state.editHistory,
+      ],
+      instruction: '',
+      isProcessing: false,
+    }
+  }),
 
   setCurrentPage: (currentPage) => set({ currentPage }),
   setZoom: (zoom) => set({ zoom }),
@@ -67,6 +70,7 @@ const useEditorStore = create((set) => ({
     pageCount: 0,
     textPreview: '',
     uploadedFile: null,
+    pages: [],
     instruction: '',
     isProcessing: false,
     downloadUrl: null,

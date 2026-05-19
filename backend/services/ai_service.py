@@ -50,11 +50,16 @@ Supported actions and their JSON schemas:
 7. Change background color:
 {"action": "change_background", "color": [r, g, b]} # r, g, b are floats between 0 and 1 (e.g. black is [0, 0, 0])
 
+8. Dark mode / invert colors (background black, text white, images preserved — NO OCR needed):
+{"action": "invert_colors", "bg_color": [0, 0, 0], "text_color": [1, 1, 1]}
+Use this when the user asks for: dark mode, black background, invert, night mode, white text on black background.
+
 Rules:
 - Respond ONLY with the JSON object. No explanation, no markdown, no code fences.
 - For summarize, translate, and improve_text, process the actual PDF text provided.
 - Keep JSON keys exactly as shown.
 - For translate/improve_text, only include pages that need changes.
+- For dark mode / invert requests, always prefer invert_colors over change_background.
 """
 
 

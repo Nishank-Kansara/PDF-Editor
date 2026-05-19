@@ -22,6 +22,16 @@ export async function uploadPDF(file) {
 }
 
 /**
+ * Fetch per-page thumbnail images for an uploaded PDF.
+ * Returns an array of { page, width, height, data } where data is a base64 JPEG data URI.
+ * @param {string} fileId
+ */
+export async function getPageThumbnails(fileId) {
+  const { data } = await api.get(`/pages/${fileId}`)
+  return data.pages  // array of { page, width, height, data }
+}
+
+/**
  * Send an edit instruction to the AI.
  * @param {string} fileId
  * @param {string} instruction

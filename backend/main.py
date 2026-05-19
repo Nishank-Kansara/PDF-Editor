@@ -9,7 +9,9 @@ Endpoints:
 import os
 import uuid
 import shutil
+import base64
 from pathlib import Path
+import fitz  # PyMuPDF — for thumbnail generation
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -143,6 +145,38 @@ async def health():
     return {"status": "ok", "model": "gpt-4.1-mini"}
 
 
+@app.get("/pages/{file_id}")
+async def get_page_thumbnails(file_id: str):
+    """
+    Return a list of base64-encoded JPEG thumbnail images for every page
+    of the uploaded PDF (max 160px wide). No OCR, no AI — pure PyMuPDF.
+    """
+    # Sanitize file_id
+    file_id = file_id.replace("/", "").replace("..", "")
+    pdf_path = UPLOADS_DIR / f"{file_id}.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="PDF not found.")
+
+    doc = fitz.open(str(pdf_path))
+    thumbnails = []
+
+    for i, page in enumerate(doc):
+        # Render at a small scale for thumbnails (scale = 0.25 ≈ 72dpi*0.25)
+        mat = fitz.Matrix(0.3, 0.3)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        img_bytes = pix.tobytes(output="jpeg", jpg_quality=70)
+        b64 = base64.b64encode(img_bytes).decode("utf-8")
+        thumbnails.append({
+            "page": i + 1,
+            "width": pix.width,
+            "height": pix.height,
+            "data": f"data:image/jpeg;base64,{b64}",
+        })
+
+    doc.close()
+    return {"file_id": file_id, "pages": thumbnails}
+
+
 # ── Action dispatcher ─────────────────────────────────────────────────────────
 
 def _apply_action(action: dict, input_path: str, output_path: str) -> str:
@@ -185,6 +219,12 @@ def _apply_action(action: dict, input_path: str, output_path: str) -> str:
         color = action.get("color", [0, 0, 0])
         edit_service.change_background(input_path, output_path, color)
         return f"Changed background color of all pages."
+
+    elif name == "invert_colors":
+        bg = action.get("bg_color", [0, 0, 0])
+        fg = action.get("text_color", [1, 1, 1])
+        edit_service.invert_colors(input_path, output_path, bg, fg)
+        return "Converted PDF to dark mode — background is now black, text is white, images preserved."
 
     else:
         import shutil

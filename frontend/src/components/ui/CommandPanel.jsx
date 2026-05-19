@@ -3,13 +3,67 @@ import { motion, AnimatePresence } from 'framer-motion'
 import useEditorStore from '../../store/editorStore'
 import { editPDF } from '../../services/api'
 
+// ── Suggestion definitions ─────────────────────────────────────────────────
+// Each suggestion has a visible label, an icon emoji, a color accent,
+// and the hidden instruction sent to the AI backend.
 const SUGGESTIONS = [
-  { label: 'Replace text', prompt: 'Replace [old text] with [new text]' },
-  { label: 'Add watermark', prompt: 'Add a CONFIDENTIAL watermark to all pages' },
-  { label: 'Summarize PDF', prompt: 'Summarize this PDF and add a summary page' },
-  { label: 'Translate Hindi', prompt: 'Translate this PDF to Hindi' },
-  { label: 'Improve writing', prompt: 'Improve the text professionally and rewrite it' },
-  { label: 'Highlight keys', prompt: 'Highlight the most important phrases' },
+  {
+    label: 'Dark Mode',
+    icon: '🌙',
+    accent: '#a855f7',
+    accentBg: 'rgba(168,85,247,0.08)',
+    accentBorder: 'rgba(168,85,247,0.25)',
+    prompt: 'Convert this PDF to dark mode — make the background black and all text white, preserve images',
+  },
+  {
+    label: 'Add Watermark',
+    icon: '🔒',
+    accent: '#00f5ff',
+    accentBg: 'rgba(0,245,255,0.06)',
+    accentBorder: 'rgba(0,245,255,0.2)',
+    prompt: 'Add a CONFIDENTIAL watermark to all pages',
+  },
+  {
+    label: 'Summarize',
+    icon: '📝',
+    accent: '#10b981',
+    accentBg: 'rgba(16,185,129,0.07)',
+    accentBorder: 'rgba(16,185,129,0.22)',
+    prompt: 'Summarize this PDF and add a summary page at the end',
+  },
+  {
+    label: 'Translate Hindi',
+    icon: '🇮🇳',
+    accent: '#f59e0b',
+    accentBg: 'rgba(245,158,11,0.07)',
+    accentBorder: 'rgba(245,158,11,0.2)',
+    prompt: 'Translate this PDF to Hindi',
+  },
+  {
+    label: 'Improve Writing',
+    icon: '✨',
+    accent: '#3b82f6',
+    accentBg: 'rgba(59,130,246,0.07)',
+    accentBorder: 'rgba(59,130,246,0.2)',
+    prompt: 'Improve the text professionally and rewrite it',
+  },
+  {
+    label: 'Highlight Keys',
+    icon: '🔍',
+    accent: '#ec4899',
+    accentBg: 'rgba(236,72,153,0.07)',
+    accentBorder: 'rgba(236,72,153,0.2)',
+    prompt: 'Highlight the most important phrases and key points',
+  },
+  {
+    label: 'Replace Text',
+    icon: '🔄',
+    accent: '#06b6d4',
+    accentBg: 'rgba(6,182,212,0.07)',
+    accentBorder: 'rgba(6,182,212,0.2)',
+    prompt: 'Replace [old text] with [new text]',
+    hasInput: true,   // this chip opens a mini input instead of firing directly
+  },
 ]
 
 export default function CommandPanel() {
@@ -20,14 +74,20 @@ export default function CommandPanel() {
   } = useEditorStore()
 
   const [error, setError] = useState(null)
+  const [activeChip, setActiveChip] = useState(null)
+  const [customText, setCustomText] = useState('')  // for "Replace Text" mini input
 
-  const handleProcess = async () => {
-    if (!fileId || !instruction.trim()) return
+  // ── Fire edit with a given prompt ──────────────────────────────────────
+  const fireEdit = async (prompt) => {
+    if (!fileId || !prompt.trim()) return
     setError(null)
     setProcessing(true)
+    setInstruction(prompt)  // keep store in sync (hidden from UI)
     try {
-      const result = await editPDF(fileId, instruction)
+      const result = await editPDF(fileId, prompt)
       setEditResult(result)
+      setActiveChip(null)
+      setCustomText('')
     } catch (err) {
       const msg = err?.response?.data?.detail ?? err.message ?? 'Unknown error'
       setError(msg)
@@ -35,11 +95,16 @@ export default function CommandPanel() {
     }
   }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleProcess()
+  const handleChipClick = (s) => {
+    if (!fileId || isProcessing) return
+    if (s.hasInput) {
+      setActiveChip(activeChip === s.label ? null : s.label)
+    } else {
+      fireEdit(s.prompt)
+    }
   }
 
-  const canProcess = fileId && instruction.trim() && !isProcessing
+  const canProcess = fileId && !isProcessing
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -74,7 +139,7 @@ export default function CommandPanel() {
           </div>
           <div style={{ minWidth: 0 }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '0.9375rem', fontWeight: 600, lineHeight: 1.2 }}>
-              AI Command
+              AI Commands
             </h3>
             {fileName && (
               <p
@@ -117,75 +182,156 @@ export default function CommandPanel() {
         }}
       >
 
-        {/* Instruction textarea */}
-        <div>
-          <label
+        {/* No PDF uploaded state */}
+        {!fileId && (
+          <div
             style={{
-              display: 'block',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: 'var(--color-text-secondary)',
-              marginBottom: '8px',
-              letterSpacing: '0.02em',
-              textTransform: 'uppercase',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '32px 16px',
+              borderRadius: 'var(--radius-lg)',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px dashed var(--color-border)',
+              textAlign: 'center',
+              gap: '8px',
             }}
           >
-            Your Instruction
-          </label>
-          <textarea
-            className="input-field"
-            rows={5}
-            placeholder='e.g. "Replace John with Nishank" or "Add a CONFIDENTIAL watermark"'
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isProcessing || !fileId}
-            style={{
-              fontFamily: 'var(--font-sans)',
-              resize: 'none',
-              lineHeight: 1.6,
-            }}
-          />
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.75rem', marginTop: '6px' }}>
-            Tip: Press <kbd style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '4px',
-              padding: '1px 6px',
-              fontSize: '0.7rem',
-              fontFamily: 'monospace',
-            }}>Ctrl+Enter</kbd> to process
-          </p>
-        </div>
-
-        {/* Suggestion chips */}
-        <div>
-          <p
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: 'var(--color-text-secondary)',
-              marginBottom: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-            }}
-          >
-            Quick Suggestions
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s.label}
-                onClick={() => setInstruction(s.prompt)}
-                disabled={isProcessing || !fileId}
-                className="chip chip-cyan"
-                style={{ lineHeight: 1.4 }}
-              >
-                {s.label}
-              </button>
-            ))}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '32px', height: '32px', color: 'var(--color-muted)' }}>
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+              Upload a PDF to start editing
+            </p>
           </div>
-        </div>
+        )}
+
+        {/* Quick Action chips */}
+        {fileId && (
+          <div>
+            <p
+              style={{
+                fontSize: '0.6875rem',
+                fontWeight: 700,
+                color: 'var(--color-muted)',
+                marginBottom: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Quick Actions
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {SUGGESTIONS.map((s) => {
+                const isChipActive = activeChip === s.label
+                const isRunning = isProcessing
+                return (
+                  <div key={s.label}>
+                    <motion.button
+                      whileHover={canProcess ? { x: 3 } : {}}
+                      whileTap={canProcess ? { scale: 0.97 } : {}}
+                      onClick={() => handleChipClick(s)}
+                      disabled={!canProcess}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 14px',
+                        borderRadius: 'var(--radius-md)',
+                        background: isChipActive ? s.accentBg : 'rgba(255,255,255,0.025)',
+                        border: `1px solid ${isChipActive ? s.accentBorder : 'var(--color-border)'}`,
+                        cursor: canProcess ? 'pointer' : 'not-allowed',
+                        opacity: canProcess ? 1 : 0.5,
+                        transition: 'all 0.2s ease',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{s.icon}</span>
+                      <span
+                        style={{
+                          flex: 1,
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: isChipActive ? s.accent : 'var(--color-text)',
+                          transition: 'color 0.2s',
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                      {/* Arrow or spinner */}
+                      {isRunning && instruction === s.prompt ? (
+                        <div
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            borderRadius: '50%',
+                            border: `2px solid ${s.accent}40`,
+                            borderTopColor: s.accent,
+                            animation: 'spin 0.7s linear infinite',
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                          style={{ width: '14px', height: '14px', color: 'var(--color-muted)', flexShrink: 0 }}>
+                          <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </motion.button>
+
+                    {/* Mini input for chips that need extra info (e.g., Replace Text) */}
+                    <AnimatePresence>
+                      {isChipActive && s.hasInput && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <div
+                            style={{
+                              marginTop: '6px',
+                              padding: '12px',
+                              borderRadius: 'var(--radius-md)',
+                              background: s.accentBg,
+                              border: `1px solid ${s.accentBorder}`,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                            }}
+                          >
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                              Type your instruction (e.g. "Replace John with Nishank"):
+                            </p>
+                            <textarea
+                              className="input-field"
+                              rows={3}
+                              placeholder='e.g. Replace "John" with "Nishank"'
+                              value={customText}
+                              onChange={(e) => setCustomText(e.target.value)}
+                              style={{ fontFamily: 'var(--font-sans)', resize: 'none', fontSize: '0.8125rem' }}
+                            />
+                            <motion.button
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => customText.trim() && fireEdit(customText)}
+                              disabled={!customText.trim()}
+                              className="btn btn-primary btn-sm"
+                            >
+                              Apply
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         <AnimatePresence>
@@ -271,17 +417,17 @@ export default function CommandPanel() {
           <div>
             <p
               style={{
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                color: 'var(--color-text-secondary)',
+                fontSize: '0.6875rem',
+                fontWeight: 700,
+                color: 'var(--color-muted)',
                 marginBottom: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.02em',
+                letterSpacing: '0.06em',
               }}
             >
-              Edit History
+              History
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {editHistory.map((item) => (
                 <motion.div
                   key={item.id}
@@ -318,7 +464,7 @@ export default function CommandPanel() {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {item.instruction}
+                    {item.description}
                   </p>
                 </motion.div>
               ))}
@@ -326,80 +472,41 @@ export default function CommandPanel() {
           </div>
         )}
 
-        {!fileId && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '32px 16px',
-              borderRadius: 'var(--radius-lg)',
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px dashed var(--color-border)',
-              textAlign: 'center',
-              gap: '8px',
-            }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '32px', height: '32px', color: 'var(--color-muted)' }}>
-              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
-              Upload a PDF to start editing
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* ── Process Button (sticky footer) ──────────────────────────────── */}
-      <div
-        style={{
-          padding: '16px 20px',
-          borderTop: '1px solid var(--color-border)',
-          background: 'var(--color-surface)',
-          flexShrink: 0,
-        }}
-      >
-        <motion.button
-          whileHover={{ scale: canProcess ? 1.02 : 1 }}
-          whileTap={{ scale: canProcess ? 0.97 : 1 }}
-          onClick={handleProcess}
-          disabled={!canProcess}
-          className={`btn btn-lg btn-full ${canProcess ? 'btn-primary' : ''}`}
-          style={
-            !canProcess
-              ? {
-                  background: 'rgba(255,255,255,0.05)',
-                  color: 'var(--color-muted)',
-                  cursor: 'not-allowed',
-                  border: '1px solid var(--color-border)',
-                }
-              : {}
-          }
-        >
-          {isProcessing ? (
-            <>
+        {/* Processing overlay message */}
+        <AnimatePresence>
+          {isProcessing && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(0,245,255,0.05)',
+                border: '1px solid rgba(0,245,255,0.15)',
+              }}
+            >
               <div
                 style={{
                   width: '16px',
                   height: '16px',
                   borderRadius: '50%',
-                  border: '2px solid rgba(3,7,18,0.3)',
-                  borderTopColor: '#030712',
+                  border: '2px solid rgba(0,245,255,0.2)',
+                  borderTopColor: '#00f5ff',
                   animation: 'spin 0.75s linear infinite',
+                  flexShrink: 0,
                 }}
               />
-              Processing with AI…
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '16px', height: '16px' }}>
-                <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Process with AI
-            </>
+              <p style={{ color: '#00f5ff', fontSize: '0.8125rem', fontWeight: 500 }}>
+                AI is processing your PDF…
+              </p>
+            </motion.div>
           )}
-        </motion.button>
+        </AnimatePresence>
+
       </div>
     </div>
   )
