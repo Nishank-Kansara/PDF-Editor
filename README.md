@@ -53,8 +53,8 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-Backend will be available at: https://pdf-editor-0eg9.onrender.com  
-API docs: https://pdf-editor-0eg9.onrender.com/docs
+Backend will be available at: https://pdf-editor-0ls5.onrender.com  
+API docs: https://pdf-editor-0ls5.onrender.com/docs
 
 ---
 
@@ -70,7 +70,7 @@ npm install
 npm run dev
 ```
 
-Frontend will be available at: http://localhost:5173
+Frontend will be available at: https://pdf-editor-xi-jade.vercel.app (or http://localhost:5173 for local dev)
 
 ---
 

@@ -1,7 +1,7 @@
 import requests
 import os
 
-BASE_URL = "https://pdf-editor-0eg9.onrender.com"
+BASE_URL = "https://pdf-editor-0ls5.onrender.com"
 
 def test_api():
     print("Testing Health...")

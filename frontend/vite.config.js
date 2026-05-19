@@ -10,10 +10,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/upload': 'https://pdf-editor-0eg9.onrender.com',
-      '/edit': 'https://pdf-editor-0eg9.onrender.com',
-      '/download': 'https://pdf-editor-0eg9.onrender.com',
-      '/health': 'https://pdf-editor-0eg9.onrender.com',
+      '/upload': 'https://pdf-editor-0ls5.onrender.com',
+      '/edit': 'https://pdf-editor-0ls5.onrender.com',
+      '/download': 'https://pdf-editor-0ls5.onrender.com',
+      '/health': 'https://pdf-editor-0ls5.onrender.com',
     },
   },
 })
