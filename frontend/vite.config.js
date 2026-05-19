@@ -10,10 +10,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/upload': 'http://localhost:8000',
-      '/edit': 'http://localhost:8000',
-      '/download': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
+      '/upload': 'https://pdf-editor-0eg9.onrender.com',
+      '/edit': 'https://pdf-editor-0eg9.onrender.com',
+      '/download': 'https://pdf-editor-0eg9.onrender.com',
+      '/health': 'https://pdf-editor-0eg9.onrender.com',
     },
   },
 })

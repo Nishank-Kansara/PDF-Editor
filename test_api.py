@@ -1,7 +1,7 @@
 import requests
 import os
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "https://pdf-editor-0eg9.onrender.com"
 
 def test_api():
     print("Testing Health...")
