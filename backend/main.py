@@ -33,6 +33,9 @@ OUTPUTS_DIR = BASE_DIR / "outputs"
 UPLOADS_DIR.mkdir(exist_ok=True)
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
+# ── Limits ────────────────────────────────────────────────────────────────────
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
+
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="AI PDF Editor API",
@@ -66,8 +69,16 @@ async def upload_pdf(file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     save_path = UPLOADS_DIR / f"{file_id}.pdf"
 
+    # Read and enforce size limit
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(contents) / 1024 / 1024:.1f} MB). Maximum allowed size is 100 MB.",
+        )
+
     with open(save_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(contents)
 
     try:
         page_count = get_page_count(str(save_path))
@@ -86,25 +97,46 @@ async def upload_pdf(file: UploadFile = File(...)):
 @app.post("/edit")
 async def edit_pdf(request: EditRequest):
     """
-    Parse instruction via AI, apply edits to the PDF, return download URL.
+    Parse instruction via AI (or fast-path directly), apply edits, return download URL.
     """
     input_path = UPLOADS_DIR / f"{request.file_id}.pdf"
     if not input_path.exists():
         raise HTTPException(status_code=404, detail="PDF not found. Please upload first.")
 
-    # 1. Extract full text for AI context
-    try:
-        pdf_text = extract_text(str(input_path))
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Failed to extract text: {e}")
+    instr_lower = request.instruction.lower()
 
-    # 2. Ask AI to parse instruction into a structured action
-    try:
-        action = parse_instruction(pdf_text, request.instruction)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"AI parsing failed: {e}")
+    # ── Fast-path: bypass AI for unambiguous intent keywords ─────────────────
+    # These actions need no PDF text context, so we skip the OpenAI round-trip.
+    fast_action: dict | None = None
 
-    # 3. Apply the editing action
+    if any(k in instr_lower for k in ("dark mode", "invert", "night mode", "black background", "white background", "light mode")):
+        fast_action = {"action": "invert_colors", "bg_color": [0, 0, 0], "text_color": [1, 1, 1]}
+
+    elif any(k in instr_lower for k in ("remove highlight", "clear highlight", "delete highlight", "remove annotation")):
+        fast_action = {"action": "remove_highlights"}
+
+    elif any(k in instr_lower for k in ("watermark",)):
+        # Extract the watermark text after "watermark" if provided, else default
+        import re
+        m = re.search(r'watermark[:\s]+([\w\s]+)', request.instruction, re.IGNORECASE)
+        wm_text = m.group(1).strip().upper() if m else "CONFIDENTIAL"
+        fast_action = {"action": "add_watermark", "text": wm_text}
+
+    if fast_action:
+        action = fast_action
+    else:
+        # ── AI path: extract text and ask GPT ────────────────────────────────
+        try:
+            pdf_text = extract_text(str(input_path))
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Failed to extract text: {e}")
+
+        try:
+            action = parse_instruction(pdf_text, request.instruction)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"AI parsing failed: {e}")
+
+    # ── Apply the editing action ──────────────────────────────────────────────
     output_id = str(uuid.uuid4())
     output_path = OUTPUTS_DIR / f"{output_id}.pdf"
 
@@ -214,6 +246,10 @@ def _apply_action(action: dict, input_path: str, output_path: str) -> str:
         phrases = action.get("phrases", [])
         edit_service.highlight_phrases(input_path, output_path, phrases)
         return f"Highlighted {len(phrases)} phrase(s)."
+
+    elif name == "remove_highlights":
+        count = edit_service.remove_highlights(input_path, output_path)
+        return f"Removed {count} highlight annotation(s) from the PDF."
 
     elif name == "change_background":
         color = action.get("color", [0, 0, 0])

@@ -1,7 +1,7 @@
 import requests
 import os
 
-BASE_URL = "https://pdf-editor-0ls5.onrender.com"
+BASE_URL = "http://127.0.0.1:8000"
 
 def test_api():
     print("Testing Health...")
@@ -37,7 +37,7 @@ def test_api():
     try:
         payload = {
             "file_id": file_id,
-            "instruction": "Replace text 'Hello' with 'World'"
+            "instruction": "Convert this PDF from dark to light mode"
         }
         r = requests.post(f"{BASE_URL}/edit", json=payload)
         print("Edit Status:", r.status_code)

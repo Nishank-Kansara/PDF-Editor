@@ -24,10 +24,16 @@ function UploadZone({ onUpload, isUploading }) {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef()
 
+  const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100 MB
+
   const handleFiles = async (files) => {
     const file = files[0]
     if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
       alert('Please select a PDF file.')
+      return
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 100 MB.`)
       return
     }
     await onUpload(file)
@@ -112,7 +118,7 @@ function UploadZone({ onUpload, isUploading }) {
               <span style={{ color: '#00f5ff', fontWeight: 600 }}>browse</span>
             </p>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.8125rem' }}>
-              Supports typed PDF files · Max 20 MB
+              Supports typed PDF files · Max 100 MB
             </p>
           </div>
         </>

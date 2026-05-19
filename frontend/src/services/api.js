@@ -2,9 +2,13 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
 
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024 // 100 MB
+
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 120000, // 2 minutes (AI calls can be slow)
+  timeout: 300000, // 5 minutes (large file uploads + AI calls)
+  maxBodyLength: MAX_UPLOAD_BYTES,
+  maxContentLength: MAX_UPLOAD_BYTES,
 })
 
 /**

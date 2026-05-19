@@ -56,6 +56,14 @@ const SUGGESTIONS = [
     prompt: 'Highlight the most important phrases and key points',
   },
   {
+    label: 'Remove Highlights',
+    icon: '🧹',
+    accent: '#f97316',
+    accentBg: 'rgba(249,115,22,0.07)',
+    accentBorder: 'rgba(249,115,22,0.2)',
+    prompt: 'Remove all highlights and annotations from this PDF',
+  },
+  {
     label: 'Replace Text',
     icon: '🔄',
     accent: '#06b6d4',

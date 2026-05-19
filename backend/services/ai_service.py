@@ -50,9 +50,13 @@ Supported actions and their JSON schemas:
 7. Change background color:
 {"action": "change_background", "color": [r, g, b]} # r, g, b are floats between 0 and 1 (e.g. black is [0, 0, 0])
 
-8. Dark mode / invert colors (background black, text white, images preserved — NO OCR needed):
+8. Dark/Light mode / invert colors (inverts all colors, e.g., dark to light or light to dark, images preserved):
 {"action": "invert_colors", "bg_color": [0, 0, 0], "text_color": [1, 1, 1]}
-Use this when the user asks for: dark mode, black background, invert, night mode, white text on black background.
+Use this when the user asks for: dark mode, light mode, black background, invert, night mode, day mode, white text on black background.
+
+9. Remove all highlights / annotations:
+{"action": "remove_highlights"}
+Use this when the user asks to remove highlights, clear highlights, delete annotations, or unhighlight.
 
 Rules:
 - Respond ONLY with the JSON object. No explanation, no markdown, no code fences.
@@ -73,7 +77,7 @@ def parse_instruction(pdf_text: str, instruction: str) -> dict:
         {
             "role": "user",
             "content": (
-                f"PDF TEXT:\n{pdf_text[:6000]}\n\n"  # limit context window usage
+                f"PDF TEXT:\n{pdf_text[:3000]}\n\n"  # 3 KB context is enough to identify intent
                 f"INSTRUCTION: {instruction}"
             ),
         },
@@ -82,8 +86,8 @@ def parse_instruction(pdf_text: str, instruction: str) -> dict:
     response = client.chat.completions.create(
         model="openai/gpt-4o-mini",
         messages=messages,
-        temperature=0.2,
-        max_tokens=2000,
+        temperature=0.1,
+        max_tokens=800,  # JSON actions are small; 800 is plenty
     )
 
     raw = response.choices[0].message.content.strip()

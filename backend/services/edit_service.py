@@ -152,6 +152,36 @@ def highlight_phrases(input_path: str, output_path: str, phrases: list):
     _save(doc, output_path)
 
 
+def remove_highlights(input_path: str, output_path: str) -> int:
+    """
+    Remove all highlight (and underline/squiggly/strikeout) annotations
+    from every page of the PDF.
+    Returns the total number of annotations removed.
+    """
+    # PyMuPDF annotation type constants for markup annotations
+    MARKUP_TYPES = {
+        fitz.PDF_ANNOT_HIGHLIGHT,
+        fitz.PDF_ANNOT_UNDERLINE,
+        fitz.PDF_ANNOT_SQUIGGLY,
+        fitz.PDF_ANNOT_STRIKE_OUT,
+    }
+
+    doc = _open(input_path)
+    total_removed = 0
+
+    for page in doc:
+        annots_to_delete = [
+            annot for annot in page.annots()
+            if annot.type[0] in MARKUP_TYPES
+        ]
+        for annot in annots_to_delete:
+            page.delete_annot(annot)
+            total_removed += 1
+
+    _save(doc, output_path)
+    return total_removed
+
+
 def change_background(input_path: str, output_path: str, color: list):
     """
     Change the background color of all pages in the PDF.
@@ -184,8 +214,8 @@ def invert_colors(input_path: str, output_path: str,
     src = fitz.open(input_path)
     out = fitz.open()          # new empty PDF
 
-    # 3× scale ≈ 216 DPI — crisp on screen and for normal printing
-    mat = fitz.Matrix(3, 3)
+    # 2× scale ≈ 144 DPI — good quality with ~50% faster render than 3×
+    mat = fitz.Matrix(2, 2)
 
     for src_page in src:
         # 1. Render the original page to an RGB pixmap
