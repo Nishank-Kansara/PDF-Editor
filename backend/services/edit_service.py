@@ -168,80 +168,43 @@ def change_background(input_path: str, output_path: str, color: list):
 def invert_colors(input_path: str, output_path: str,
                   bg_color: list = None, text_color: list = None):
     """
-    Convert PDF to dark mode (pure PyMuPDF — no OCR, no OpenAI):
-      - Draws a solid black background (underlay).
-      - Pixel-inverts all embedded images so they stay visible.
-      - Re-draws all text in white.
+    Convert PDF to dark mode — RENDER-AND-INVERT approach.
 
-    KEY FIX: span data is collected BEFORE apply_redactions() is called,
-    because after redaction the text is erased from the page content stream.
+    Strategy: render each page as a high-res pixmap (3× = 216 DPI),
+    invert every pixel, then embed as a full-page image in a new PDF.
+
+    Why not redact+reinsert?
+      PyMuPDF reinserts text using its built-in Helvetica — not the
+      original font. This causes wrong characters, wrong spacing, and
+      missing glyphs for non-Latin text. Rendering is 100% faithful.
+
+    Result: black background, white text, inverted images — guaranteed
+    to work on ANY PDF regardless of font embedding.
     """
-    if bg_color is None:
-        bg_color = [0, 0, 0]      # black
-    if text_color is None:
-        text_color = [1, 1, 1]    # white
+    src = fitz.open(input_path)
+    out = fitz.open()          # new empty PDF
 
-    doc = _open(input_path)
+    # 3× scale ≈ 216 DPI — crisp on screen and for normal printing
+    mat = fitz.Matrix(3, 3)
 
-    for page in doc:
-        # ── STEP 1: Save ALL span data BEFORE touching anything ───────────
-        raw = page.get_text("rawdict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
-        spans_data = []
-        for block in raw.get("blocks", []):
-            if block.get("type") != 0:   # 0 = text block
-                continue
-            for line in block.get("lines", []):
-                for span in line.get("spans", []):
-                    text   = span.get("text", "")
-                    origin = span.get("origin")
-                    if not text.strip() or not origin:
-                        continue
-                    spans_data.append({
-                        "text":   text,
-                        "origin": origin,
-                        "size":   span.get("size", 11),
-                        "bbox":   span["bbox"],
-                    })
+    for src_page in src:
+        # 1. Render the original page to an RGB pixmap
+        pix = src_page.get_pixmap(matrix=mat, alpha=False, colorspace=fitz.csRGB)
 
-        # ── STEP 2: Paint black background (underlay) ─────────────────────
-        page.draw_rect(page.rect, color=None, fill=bg_color, overlay=False)
+        # 2. Invert every pixel (white→black, black→white, colours inverted)
+        pix.invert_irect(pix.irect)
 
-        # ── STEP 3: Pixel-invert embedded images ──────────────────────────
-        # Images with white content become black-compatible after inversion.
-        for img_info in page.get_images(full=True):
-            xref = img_info[0]
-            img_rects = page.get_image_rects(xref)
-            if not img_rects:
-                continue
-            try:
-                pix = fitz.Pixmap(doc, xref)
-                # Convert to plain RGB if CMYK or has alpha
-                if pix.colorspace and pix.colorspace.n > 3:
-                    pix = fitz.Pixmap(fitz.csRGB, pix)
-                if pix.alpha:
-                    pix = fitz.Pixmap(pix, 0)   # strip alpha
-                pix.invert_irect(pix.irect)      # pixel-level inversion
-                for rect in img_rects:
-                    page.insert_image(rect, pixmap=pix, overlay=True)
-            except Exception as e:
-                print(f"[invert_colors] image xref {xref} skipped: {e}")
+        # 3. Create a matching new page in the output PDF
+        #    (same physical dimensions as the source page)
+        w, h = src_page.rect.width, src_page.rect.height
+        new_page = out.new_page(width=w, height=h)
 
-        # ── STEP 4: Redact original text (fill with bg color) ─────────────
-        for sd in spans_data:
-            page.add_redact_annot(fitz.Rect(sd["bbox"]), fill=bg_color)
-        page.apply_redactions()
+        # 4. Insert the inverted pixmap as a full-page image
+        new_page.insert_image(new_page.rect, pixmap=pix)
 
-        # ── STEP 5: Re-insert every span in white ─────────────────────────
-        for sd in spans_data:
-            page.insert_text(
-                sd["origin"],
-                sd["text"],
-                fontsize=sd["size"],
-                color=text_color,
-                overlay=True,
-            )
-
-    _save(doc, output_path)
+    out.save(output_path, garbage=4, deflate=True)
+    out.close()
+    src.close()
 
 # ── Utility ───────────────────────────────────────────────────────────────────
 
